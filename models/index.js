@@ -1,4 +1,4 @@
-import { sequelize } from "../config/postgres.js"; // Named import
+import { sequelize } from "../config/mysql.js"; // Named import
 import JobMasterModel from "./job_master.model.js";
 import PartnerModel from "./partner.model.js"; // Import the Partner model
 import ProjectMasterModel from "./project_master.model.js";
@@ -154,7 +154,7 @@ Object.values(models).forEach((model) => {
 const syncModels = async () => {
   try {
     // Now safely sync your models
-    // await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: true });
     console.log("✅ Sync successful");
   } catch (err) {
     console.error("❌ Sync failed:", err);

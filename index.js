@@ -2,7 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 
-import { connection } from "./config/postgres.js"; // Import syncModels
+import { connection } from "./config/mysql.js"; // Import syncModels
 import adminRoutes from "./routes/admin/admin.routes.js"; // Import admin routes
 import projectsRoutes from "./routes/super_admin/project_master/project.routes.js";
 import partnerRoutes from "./routes/super_admin/partner/index.js";

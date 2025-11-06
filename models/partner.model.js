@@ -19,8 +19,9 @@ export default (sequelize) => {
       isCustomer: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     },
     {
+      tableName: "partners", // ← EXACT TABLE NAME IN DB
       timestamps: true,
-      freezeTableName: true,
+      freezeTableName: true, // ← Now safe
     }
   );
 
