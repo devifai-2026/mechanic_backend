@@ -41,24 +41,13 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const allowedOrigins = [
-  "https://macocadmin.netlify.app/", // ✅ Your Netlify domain
-  "http://localhost:3000"              // ✅ Dev local
-];
-
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true); // ✅ Allow
-    } else {
-      callback(new Error("Not allowed by CORS")); // ❌ Block
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
-
 app.use(cors(corsOptions));
+app.use(express.urlencoded({ extended: true })); // To parse URL-encoded bodies
 
 app.use("/api/master/super/admin", adminRoutes);
 app.use("/api/master/auth", authentcationRoutes);
