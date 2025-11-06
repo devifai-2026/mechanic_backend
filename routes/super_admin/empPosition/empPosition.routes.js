@@ -12,7 +12,7 @@ const router = express.Router();
 router.post("/create", createEmpPosition);
 router.get("/getall", getAllEmpPositions);
 router.get("/get/:id", getEmpPositionById);
-router.patch("/update/:id", updateEmpPosition);
+router.post("/update/:id", updateEmpPosition);
 router.delete("/delete/:id", deleteEmpPosition);
 
 export default router;

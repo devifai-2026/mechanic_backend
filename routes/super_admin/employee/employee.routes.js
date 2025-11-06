@@ -23,7 +23,7 @@ router.post("/create", createEmployee);
 router.get("/getAll", getAllEmployees);
 router.get("/get/:id", getEmployeeById);
 router.get("/get/projects/:id", getProjectsByEmployeeId);
-router.patch("/update/:id", updateEmployee);
+router.post("/update/:id", updateEmployee);
 router.delete("/delete/:id", deleteEmployee);
 router.post(
   "/bulk-upload",

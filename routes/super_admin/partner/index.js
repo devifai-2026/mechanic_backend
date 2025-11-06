@@ -15,7 +15,7 @@ const router = express.Router();
 router.post("/create", createPartner);
 router.get("/getall", getPartners);
 router.get("/get/:id", getPartnerById);
-router.patch("/update/:id", updatePartner);
+router.post("/update/:id", updatePartner);
 router.delete("/delete/:id", deletePartner);
 router.post("/bulk-upload", upload.single("file"), bulkUploadPartners);
 

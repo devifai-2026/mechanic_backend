@@ -14,7 +14,7 @@ const router = express.Router();
 router.post("/create", createEquipmentGroup);
 router.get("/getAll", getAllEquipmentGroups);
 router.get("/get/:id", getEquipmentGroupById);
-router.patch("/update/:id", updateEquipmentGroup);
+router.post("/update/:id", updateEquipmentGroup);
 router.delete("/delete/:id", deleteEquipmentGroup);
 router.post("/bulk-upload", upload.single("file"), bulkUploadEquipmentGroups);
 

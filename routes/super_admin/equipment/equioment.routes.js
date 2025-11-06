@@ -14,7 +14,7 @@ const router = express.Router();
 router.post("/create", createEquipment);
 router.get("/getAll/", getAllEquipment);
 router.get("/get/:id", getEquipmentById);
-router.patch("/update/:id", updateEquipment);
+router.post("/update/:id", updateEquipment);
 router.delete("/delete/:id", deleteEquipment);
 router.post("/bulk-upload", upload.single("file"), bulkUploadEquipment);
 export default router;

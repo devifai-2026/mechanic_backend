@@ -88,7 +88,7 @@ router.post(
 );
 
 // Daily Progress Report Routes
-router.patch("/dpr/approve-reject/:dpr_id", approveOrRejectDPR); // Approve or Reject DPR
+router.post("/dpr/approve-reject/:dpr_id", approveOrRejectDPR); // Approve or Reject DPR
 
 router.post("/dpr/all", getAllDPRs); // Get all DPRs (optionally by project_id in body/query)
 router.post("/dpr/status/:status", getDPRsByStatus); // Get DPRs by status (approved/rejected/pending)

@@ -124,7 +124,7 @@ app.use("/", (req, res) => {
 connection();
 
 // Sync models
-syncModels(); // Ensure models are synced before starting the server
+// syncModels(); // Ensure models are synced before starting the server
 
 // Start the server
 const PORT = process.env.PORT || 8000;

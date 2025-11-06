@@ -14,7 +14,7 @@ const router = express.Router();
 router.post("/", createConsumableItem);
 router.get("/", getAllConsumableItems);
 router.get("/:id", getConsumableItemById);
-router.patch("/:id", updateConsumableItem);
+router.post("/:id", updateConsumableItem);
 router.delete("/:id", deleteConsumableItem);
 router.post("/bulk-upload", upload.single("file"), bulkUploadConsumableItems);
 

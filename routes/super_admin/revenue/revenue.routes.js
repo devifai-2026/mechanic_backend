@@ -14,7 +14,7 @@ const router = express.Router();
 router.post("/create", createRevenue);
 router.get("/getAll", getAllRevenues);
 router.get("/get/:id", getRevenueById);
-router.patch("/update/:id", updateRevenue);
+router.post("/update/:id", updateRevenue);
 router.delete("/delete/:id", deleteRevenue);
 router.post("/bulk-upload", upload.single("file"), bulkUploadRevenues);
 

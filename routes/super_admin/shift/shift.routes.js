@@ -14,7 +14,7 @@ const router = express.Router();
 router.post("/create", createShift);
 router.get("/getAll", getAllShifts);
 router.get("/get/:id", getShiftById);
-router.patch("/update/:id", updateShift);
+router.post("/update/:id", updateShift);
 router.delete("/delete/:id", deleteShift);
 router.post("/bulk-upload", upload.single("file"), bulkUploadShifts);
 

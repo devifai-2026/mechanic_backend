@@ -21,7 +21,7 @@ router.get("/getAll", getStores);
 router.get("/get/:id", getStoreById);
 
 // PUT /store/update/:id
-router.patch("/update/:id", updateStore);
+router.post("/update/:id", updateStore);
 
 // DELETE /store/delete/:id
 router.delete("/delete/:id", deleteStore);
