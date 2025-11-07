@@ -30,6 +30,8 @@ export default (sequelize) => {
       // ✅ match the key in models/index.js
       foreignKey: "customer_id",
       as: "projects",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
   };
 

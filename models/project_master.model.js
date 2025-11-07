@@ -33,11 +33,15 @@ export default (sequelize) => {
     ProjectMasterModel.belongsTo(models.Partner, {
       foreignKey: "customer_id",
       as: "customer",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
     ProjectMasterModel.belongsToMany(models.Equipment, {
       through: models.EquipmentProject, // Join table
       foreignKey: "project_id",
       as: "equipments", // Optional alias
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
 
     // Staff relationship through ProjectStaff
@@ -46,18 +50,24 @@ export default (sequelize) => {
       foreignKey: "project_id",
       otherKey: "emp_id", // 👈 This is the fix
       as: "staff",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
     // New revenue association
     ProjectMasterModel.belongsToMany(models.RevenueMaster, {
       through: models.ProjectRevenue,
       foreignKey: "project_id",
       as: "revenues",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
     ProjectMasterModel.belongsToMany(models.Store, {
       through: models.StoreProject,
       foreignKey: "project_id",
       otherKey: "store_id",
       as: "store_locations",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
   };
 
