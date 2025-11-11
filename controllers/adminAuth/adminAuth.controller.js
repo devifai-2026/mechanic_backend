@@ -27,13 +27,13 @@ export const adminLogin = async (req, res) => {
       return res.status(401).json({ message: "Incorrect password" });
     }
 
-    if (admin.active_jwt_token) {
-      return res.status(403).json({
-        isMultipleLogin: true,
-        message:
-          "Admin already logged in on another device. Please logout first.",
-      });
-    }
+    // if (admin.active_jwt_token) {
+    //   return res.status(403).json({
+    //     isMultipleLogin: true,
+    //     message:
+    //       "Admin already logged in on another device. Please logout first.",
+    //   });
+    // }
 
     const token = jwt.sign(
       { id: admin.id, admin_id: admin.admin_id },
