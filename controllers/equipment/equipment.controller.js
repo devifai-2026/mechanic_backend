@@ -4,7 +4,6 @@ const { Equipment, EquipmentGroup, EquipmentProject, OEM, Project_Master } =
   models;
 
 // Create Equipment
-// Create Equipment
 export const createEquipment = async (req, res) => {
   const {
     equipment_name,
@@ -93,6 +92,11 @@ export const getAllEquipment = async (req, res) => {
           model: Project_Master,
           as: "projects",
           through: { attributes: [] },
+        },
+        {
+          model: OEM,
+          as: "oemDetails",
+          attributes: ["id", "oem_name", "oem_code"],
         },
       ],
     });

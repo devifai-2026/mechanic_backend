@@ -48,6 +48,10 @@ export default (sequelize) => {
       foreignKey: "equipment_group_id",
       as: "equipmentGroup",
     });
+    EquipmentModel.belongsTo(models.OEM, {
+      foreignKey: "oem",
+      as: "oemDetails", 
+    });
   };
 
   return EquipmentModel;
