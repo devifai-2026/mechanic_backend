@@ -1,3 +1,4 @@
+// models/equipment_group.model.js
 import { DataTypes } from "sequelize";
 
 export default (sequelize) => {
@@ -19,7 +20,8 @@ export default (sequelize) => {
   );
 
   EquipmentGroupModel.associate = (models) => {
-    EquipmentGroupModel.hasMany(models.Equipment, {
+    EquipmentGroupModel.belongsToMany(models.Equipment, {
+      through: "EquipmentEquipmentGroup",
       foreignKey: "equipment_group_id",
       as: "equipments",
     });

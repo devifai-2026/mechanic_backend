@@ -44,6 +44,7 @@ import DieselInvoiceModel from "./DieselInvoices.js";
 import DieselInvoiceForm from "./DieselInvoiceSubform.model.js";
 import EmployeeLoginLogModel from "../models/junctionTable/EmployeeLoginLog.js";
 import AdminModel from "../models/admin.model.js";
+import EquipmentEquipmentGroupModel from "./junctionTable/EquipmentEquipmentGroup.js";
 
 //Step 1: Initialize models
 const Project_Master = ProjectMasterModel(sequelize); // Pass the sequelize instance to the model
@@ -56,6 +57,7 @@ const Store = StoreModel(sequelize);
 const EquipmentGroup = EquipmentGroupModel(sequelize);
 const Equipment = EquipmentModel(sequelize);
 const Role = RoleModel(sequelize);
+const EquipmentEquipmentGroup = EquipmentEquipmentGroupModel(sequelize);
 const EmpPositionsModel = EmpPositions(sequelize);
 const Employee = EmployeeModel(sequelize);
 const EquipmentProject = EquipProjectModel(sequelize);
@@ -121,6 +123,7 @@ const models = {
   OEM,
   AccountGroup,
   Account,
+  EquipmentEquipmentGroup, // Add this
   DieselReceipt,
   DieselReceiptItem,
   ConsumptionSheet,
@@ -150,11 +153,115 @@ Object.values(models).forEach((model) => {
   }
 });
 
+
+// Add this to your models/index.js file temporarily
+
+// models/index.js - Complete fix
+const fixJunctionTable = async () => {
+  try {
+    console.log("🔍 Checking data types...");
+    
+    // Check the actual data types of the referenced tables
+    const [equipmentInfo] = await sequelize.query(`
+      SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'equipment' 
+      AND TABLE_SCHEMA = 'maco_mechanic'
+      AND COLUMN_NAME = 'id'
+    `);
+    
+    const [groupInfo] = await sequelize.query(`
+      SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'equipment_group' 
+      AND TABLE_SCHEMA = 'maco_mechanic'
+      AND COLUMN_NAME = 'id'
+    `);
+    
+    console.log("Equipment ID type:", equipmentInfo[0]);
+    console.log("Equipment Group ID type:", groupInfo[0]);
+    
+    // Drop the existing junction table if it exists
+    await sequelize.query(`DROP TABLE IF EXISTS EquipmentEquipmentGroup`);
+    
+    // Create junction table with matching data types
+    const equipmentType = equipmentInfo[0]?.COLUMN_TYPE || 'CHAR(36)';
+    const groupType = groupInfo[0]?.COLUMN_TYPE || 'CHAR(36)';
+    
+    console.log(`Using equipment_id type: ${equipmentType}`);
+    console.log(`Using equipment_group_id type: ${groupType}`);
+    
+    await sequelize.query(`
+      CREATE TABLE EquipmentEquipmentGroup (
+        id CHAR(36) NOT NULL,
+        equipment_id ${equipmentType} NOT NULL,
+        equipment_group_id ${groupType} NOT NULL,
+        createdAt DATETIME NOT NULL,
+        updatedAt DATETIME NOT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY equipment_group_unique (equipment_id, equipment_group_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    
+    console.log("✅ Junction table created with correct data types");
+    
+  } catch (error) {
+    console.error("❌ Failed to fix junction table:", error.message);
+  }
+};
+
+// Call this instead of createJunctionTable
+// fixJunctionTable();
+// models/index.js - Add foreign keys
+// models/index.js - Final setup without foreign keys
+const finalizeJunctionTable = async () => {
+  try {
+    console.log("🔄 Finalizing junction table setup...");
+    
+    // Drop and recreate without foreign key attempts
+    await sequelize.query(`DROP TABLE IF EXISTS EquipmentEquipmentGroup`);
+    
+    await sequelize.query(`
+      CREATE TABLE EquipmentEquipmentGroup (
+        id CHAR(36) NOT NULL,
+        equipment_id CHAR(36) NOT NULL,
+        equipment_group_id CHAR(36) NOT NULL,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY equipment_group_unique (equipment_id, equipment_group_id),
+        INDEX idx_equipment_id (equipment_id),
+        INDEX idx_equipment_group_id (equipment_group_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    
+    console.log("✅ Junction table ready for use (without foreign keys)");
+    console.log("📝 You can add foreign keys later via database migration");
+    
+  } catch (error) {
+    console.error("❌ Final setup failed:", error.message);
+  }
+};
+
+// Replace your previous calls with this
+finalizeJunctionTable();
 // Sync the models
+// const syncModels = async () => {
+//   try {
+//     // Now safely sync your models
+//     // await sequelize.sync({ alter: true });
+//     console.log("✅ Sync successful");
+//   } catch (err) {
+//     console.error("❌ Sync failed:", err);
+//   }
+// };
+
+
+
+//DONT RUN TIHS
 const syncModels = async () => {
   try {
-    // Now safely sync your models
-    // await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: true });
     console.log("✅ Sync successful");
   } catch (err) {
     console.error("❌ Sync failed:", err);

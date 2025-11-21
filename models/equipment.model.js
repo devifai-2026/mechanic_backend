@@ -1,3 +1,4 @@
+// models/equipment.model.js
 import { DataTypes } from "sequelize";
 
 export default (sequelize) => {
@@ -15,22 +16,15 @@ export default (sequelize) => {
       purchase_date: { type: DataTypes.DATE, allowNull: false },
       oem: { type: DataTypes.STRING, allowNull: false },
       purchase_cost: { type: DataTypes.INTEGER, allowNull: false },
-      equipment_manual: { type: DataTypes.TEXT, allowNull: false },
-      maintenance_log: { type: DataTypes.JSON, allowNull: false },
-      other_log: { type: DataTypes.JSON, allowNull: false },
+      equipment_manual: { type: DataTypes.TEXT, allowNull: true },
+      maintenance_log: { type: DataTypes.JSON, allowNull: true },
+      other_log: { type: DataTypes.JSON, allowNull: true },
       hsn_number: {
         type: DataTypes.BIGINT,
         allowNull: false,
         defaultValue: 0,
       },
-      equipment_group_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
-        references: {
-          model: "equipment_group",
-          key: "id",
-        },
-      },
+      // Remove equipment_group_id field for many-to-many
     },
     {
       timestamps: true,
@@ -44,8 +38,9 @@ export default (sequelize) => {
       foreignKey: "equipment_id",
       as: "projects",
     });
-    EquipmentModel.belongsTo(models.EquipmentGroup, {
-      foreignKey: "equipment_group_id",
+    EquipmentModel.belongsToMany(models.EquipmentGroup, {
+      through: "EquipmentEquipmentGroup",
+      foreignKey: "equipment_id",
       as: "equipmentGroup",
     });
     EquipmentModel.belongsTo(models.OEM, {
