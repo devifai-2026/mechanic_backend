@@ -18,6 +18,7 @@ export const createOEM = async (req, res) => {
 export const getAllOEMs = async (req, res) => {
   try {
     const oems = await OEM.findAll();
+    console
     return res.status(200).json(oems);
   } catch (error) {
     console.error("Error fetching OEMs:", error);

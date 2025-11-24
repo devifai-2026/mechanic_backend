@@ -330,19 +330,86 @@ export const bulkUploadEquipment = async (req, res) => {
 
     const results = [];
 
+    // Function to handle Excel date serial numbers and various date formats
+    const parsePurchaseDate = (dateValue) => {
+      if (!dateValue) return null;
+      
+      console.log(`Parsing date value: ${dateValue}, Type: ${typeof dateValue}`);
+      
+      // Handle Excel serial numbers (like 45520)
+      if (typeof dateValue === 'number') {
+        console.log(`Detected Excel serial number: ${dateValue}`);
+        // Excel date serial number (number of days since January 1, 1900)
+        const excelEpoch = new Date(1900, 0, 1);
+        const date = new Date(excelEpoch.getTime() + (dateValue - 1) * 24 * 60 * 60 * 1000);
+        
+        // Adjust for Excel's leap year bug (Excel considers 1900 as a leap year)
+        if (dateValue > 60) date.setDate(date.getDate() - 1);
+        
+        const isoDate = date.toISOString().split('T')[0];
+        console.log(`Excel serial ${dateValue} converted to: ${isoDate}`);
+        return isoDate;
+      }
+      
+      // If it's already a Date object
+      if (dateValue instanceof Date) {
+        const isoDate = dateValue.toISOString().split('T')[0];
+        console.log(`Date object converted to: ${isoDate}`);
+        return isoDate;
+      }
+      
+      // If it's a string, try various formats
+      if (typeof dateValue === 'string') {
+        const trimmedValue = dateValue.trim();
+        
+        // Try dd-mm-yyyy format
+        const ddMmYyyyRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})$/;
+        const match = trimmedValue.match(ddMmYyyyRegex);
+        
+        if (match) {
+          const day = parseInt(match[1], 10);
+          const month = parseInt(match[2], 10) - 1;
+          const year = parseInt(match[3], 10);
+          
+          console.log(`Parsed dd-mm-yyyy: Day=${day}, Month=${month + 1}, Year=${year}`);
+          
+          if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900) {
+            const date = new Date(year, month, day);
+            if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === year) {
+              const isoDate = date.toISOString().split('T')[0];
+              console.log(`Valid dd-mm-yyyy date converted to: ${isoDate}`);
+              return isoDate;
+            }
+          }
+        }
+        
+        // Try other common date formats
+        console.log(`Trying to parse as generic date: ${trimmedValue}`);
+        const parsedDate = new Date(trimmedValue);
+        if (!isNaN(parsedDate.getTime())) {
+          const isoDate = parsedDate.toISOString().split('T')[0];
+          console.log(`Generic date parsed to: ${isoDate}`);
+          return isoDate;
+        }
+      }
+      
+      console.log(`Invalid date format: ${dateValue}`);
+      return null;
+    };
+
     for (const [index, row] of rows.entries()) {
       const {
         equipment_name,
         equipment_sr_no,
         additional_id,
         purchase_date,
-        oem, // This will be OEM code like "M-011"
+        oem,
         purchase_cost,
         equipment_manual,
         maintenance_log,
         other_log,
-        equipment_group, // This will be equipment group codes like "G-001,G-002"
-        project_tag, // This will be project numbers like "MC-0001,MC-0002"
+        equipment_group,
+        project_tag,
       } = row;
 
       // Validate required fields
@@ -356,12 +423,25 @@ export const bulkUploadEquipment = async (req, res) => {
       }
 
       try {
+        // Parse and validate purchase date
+        console.log(`Processing row ${index + 2}, purchase_date raw value:`, purchase_date);
+        const parsedPurchaseDate = parsePurchaseDate(purchase_date);
+        
+        if (!parsedPurchaseDate) {
+          results.push({
+            row: index + 2,
+            status: "failed",
+            message: `Invalid purchase date format: "${purchase_date}". Expected date in dd-mm-yyyy format or Excel date format`,
+          });
+          continue;
+        }
+
+        console.log(`Successfully parsed date: ${purchase_date} -> ${parsedPurchaseDate}`);
+
         // Find OEM by oem_code
-        console.log(oem.trim())
         const oemRecord = await OEM.findOne({
           where: { oem_code: oem.trim() },
         });
-        console.log({oemRecord})
 
         if (!oemRecord) {
           results.push({
@@ -433,17 +513,39 @@ export const bulkUploadEquipment = async (req, res) => {
           }
         }
 
+        // Clean log fields - set to null if they contain invalid patterns
+        const cleanLogField = (field) => {
+          if (!field || typeof field !== 'string') return null;
+          
+          const trimmedField = field.trim();
+          if (trimmedField === '') return null;
+          
+          // Check for invalid patterns (escaped backslashes, quotes, etc.)
+          const invalidPatterns = [
+            /^"+$/, // Only quotes
+            /^\\+$/, // Only backslashes
+            /^["\\\s]*$/, // Only quotes, backslashes, or whitespace
+            /^\"\\\"\\\\\\\"/, // Starts with escaped backslash patterns
+            /^\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/, // Multiple backslashes
+          ];
+          
+          const hasInvalidPattern = invalidPatterns.some(pattern => pattern.test(trimmedField));
+          const isPdfUrl = trimmedField.includes('.pdf') && trimmedField.startsWith('http');
+          
+          return hasInvalidPattern || !isPdfUrl ? null : trimmedField;
+        };
+
         // Create equipment
         const newEquipment = await Equipment.create({
           equipment_name: equipment_name.trim(),
           equipment_sr_no: equipment_sr_no.trim(),
           additional_id: additional_id ? additional_id.trim() : "",
-          purchase_date,
-          oem: oemRecord.id, // Store the OEM UUID
+          purchase_date: parsedPurchaseDate, // This will be in yyyy-mm-dd format
+          oem: oemRecord.id,
           purchase_cost: purchase_cost || 0,
-          equipment_manual: equipment_manual || null,
-          maintenance_log: maintenance_log || null,
-          other_log: other_log || null,
+          equipment_manual: cleanLogField(equipment_manual),
+          maintenance_log: cleanLogField(maintenance_log),
+          other_log: cleanLogField(other_log),
           hsn_number: 0,
         });
 
@@ -471,9 +573,10 @@ export const bulkUploadEquipment = async (req, res) => {
           row: index + 2,
           status: "success",
           equipmentId: newEquipment.id,
-          message: `Created with ${groups.length} group(s) and ${projects.length} project(s)`,
+          message: `Created with ${groups.length} group(s) and ${projects.length} project(s). Purchase date: ${parsedPurchaseDate}`,
         });
       } catch (error) {
+        console.error(`Error in row ${index + 2}:`, error);
         results.push({
           row: index + 2,
           status: "failed",
