@@ -303,11 +303,11 @@ export const updateProject = async (req, res) => {
       return res.status(404).json({ message: "Project not found." });
     }
 
-    if (!equipments.length) {
-      return res
-        .status(400)
-        .json({ message: "At least one equipment is required." });
-    }
+    // if (!equipments.length) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "At least one equipment is required." });
+    // }
     // if (!staff.length) {
     //   return res.status(400).json({ message: "At least one staff member is required." });
     // }
@@ -466,11 +466,16 @@ export const bulkUploadProjects = async (req, res) => {
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    // Use sheet_to_json with header to get proper object structure
+    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
     if (!rows.length) {
       return res.status(400).json({ message: "Excel sheet is empty" });
     }
+
+    console.log("Excel headers:", Object.keys(rows[0]));
+    console.log("First row sample:", rows[0]);
 
     // Fetch reference data and map for lookup
     const stores = await Store.findAll();
@@ -491,91 +496,194 @@ export const bulkUploadProjects = async (req, res) => {
       customers.map((c) => [c.partner_name.trim(), c.id])
     );
 
-    const dataRows = rows.slice(1);
     const results = [];
 
-    for (const row of dataRows) {
-      console.log({ row });
-
-      const [
+    for (const [index, row] of rows.entries()) {
+      const {
         projectNo,
-        customerName,
+        customer,
         orderNo,
         contractStartDate,
         contractEndDate,
-        revenuemasterStr,
-        storeStr,
-      ] = row;
+        revenueMaster,
+        equipments: equipmentStr,
+        storeLocations
+      } = row;
 
-      if (!projectNo) continue;
+      console.log(`Processing row ${index + 2}:`, {
+        projectNo,
+        customer,
+        orderNo,
+        contractStartDate,
+        contractEndDate,
+        revenueMaster,
+        equipmentStr,
+        storeLocations
+      });
 
-      // Convert revenue/store strings to IDs
-      const revenue_master_ids = revenuemasterStr
-        ? revenuemasterStr
+      if (!projectNo) {
+        results.push({
+          row: index + 2,
+          projectNo: "MISSING",
+          status: "failed",
+          message: "Project number is required",
+        });
+        continue;
+      }
+
+      // Convert revenue codes to IDs
+      const revenue_master_ids = revenueMaster
+        ? revenueMaster
             .split(",")
-            .map((code) => revenueMap.get(code.trim()))
+            .map((code) => {
+              const trimmedCode = code.trim();
+              const revenueId = revenueMap.get(trimmedCode);
+              console.log(`Revenue code: "${trimmedCode}" -> ${revenueId}`);
+              return revenueId;
+            })
             .filter(Boolean)
         : [];
 
-      const store_location_ids = storeStr
-        ? storeStr
+      // Convert store locations to IDs
+      const store_location_ids = storeLocations
+        ? storeLocations
             .split(",")
-            .map((code) => storeMap.get(code.trim()))
+            .map((code) => {
+              const trimmedCode = code.trim();
+              const storeId = storeMap.get(trimmedCode);
+              console.log(`Store code: "${trimmedCode}" -> ${storeId}`);
+              return storeId;
+            })
             .filter(Boolean)
         : [];
+
+      // Convert equipment names to IDs (if you need this for equipment relationships)
+      const equipment_ids = equipmentStr
+        ? equipmentStr
+            .split(",")
+            .map((name) => {
+              const trimmedName = name.trim();
+              const equipmentId = equipmentMap.get(trimmedName);
+              console.log(`Equipment: "${trimmedName}" -> ${equipmentId}`);
+              return equipmentId;
+            })
+            .filter(Boolean)
+        : [];
+
+      console.log(`Parsed IDs - Revenue: ${revenue_master_ids.length}, Store: ${store_location_ids.length}, Equipment: ${equipment_ids.length}`);
 
       // Validations
-      if (!customerName || !customerMap.has(customerName.trim())) {
+      if (!customer || !customerMap.has(customer.trim())) {
         results.push({
+          row: index + 2,
           projectNo,
           status: "failed",
-          message: "Invalid or missing customer name.",
+          message: `Invalid or missing customer name: "${customer}"`,
         });
         continue;
       }
 
       if (revenue_master_ids.length === 0) {
         results.push({
+          row: index + 2,
           projectNo,
           status: "failed",
-          message: "Invalid or missing revenue code(s).",
+          message: `Invalid or missing revenue code(s): "${revenueMaster}"`,
         });
         continue;
       }
 
       if (store_location_ids.length === 0) {
         results.push({
+          row: index + 2,
           projectNo,
           status: "failed",
-          message: "Invalid or missing store code(s).",
+          message: `Invalid or missing store code(s): "${storeLocations}"`,
         });
         continue;
       }
 
-      const contract_start_date = contractStartDate;
-      const contract_end_date = contractEndDate;
+      // Parse dates
+      const parseDate = (dateValue) => {
+        if (!dateValue) return null;
+        
+        // Handle Excel serial numbers
+        if (typeof dateValue === 'number') {
+          const excelEpoch = new Date(1900, 0, 1);
+          const date = new Date(excelEpoch.getTime() + (dateValue - 1) * 24 * 60 * 60 * 1000);
+          if (dateValue > 60) date.setDate(date.getDate() - 1);
+          return date.toISOString().split('T')[0];
+        }
+        
+        // Handle string dates (YYYY-MM-DD format)
+        if (typeof dateValue === 'string') {
+          const trimmedValue = dateValue.trim();
+          // Try YYYY-MM-DD format
+          const yyyyMmDdRegex = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+          const match = trimmedValue.match(yyyyMmDdRegex);
+          
+          if (match) {
+            const year = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10) - 1;
+            const day = parseInt(match[3], 10);
+            
+            if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900) {
+              const date = new Date(year, month, day);
+              if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === year) {
+                return date.toISOString().split('T')[0];
+              }
+            }
+          }
+          
+          // Try other formats
+          const parsedDate = new Date(trimmedValue);
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate.toISOString().split('T')[0];
+          }
+        }
+        
+        return null;
+      };
+
+      const contract_start_date = parseDate(contractStartDate);
+      const contract_end_date = parseDate(contractEndDate);
 
       if (!contract_start_date || !contract_end_date) {
         results.push({
+          row: index + 2,
           projectNo,
           status: "failed",
-          message: "Invalid date format. Use dd-mm-yyyy only.",
+          message: `Invalid date format. contractStartDate: "${contractStartDate}", contractEndDate: "${contractEndDate}". Use YYYY-MM-DD format.`,
         });
         continue;
       }
 
       // Process and save the project
-      const result = await processProjectRow({
-        projectNo,
-        customer: customerName,
-        orderNo,
-        contract_start_date,
-        contract_end_date,
-        revenue_master_ids,
-        store_location_ids,
-      });
+      try {
+        const result = await processProjectRow({
+          projectNo: projectNo.trim(),
+          customer: customer.trim(),
+          orderNo: orderNo ? orderNo.toString().trim() : "",
+          contract_start_date,
+          contract_end_date,
+          revenue_master_ids,
+          store_location_ids,
+          equipment_ids // Pass equipment IDs if needed
+        });
 
-      results.push(result);
+        results.push({
+          row: index + 2,
+          ...result
+        });
+      } catch (error) {
+        console.error(`Error processing project ${projectNo}:`, error);
+        results.push({
+          row: index + 2,
+          projectNo,
+          status: "failed",
+          message: error.message,
+        });
+      }
     }
 
     return res.status(201).json({

@@ -38,10 +38,7 @@ export default (sequelize) => {
     });
 
     // If consumable items reference revenue_master
-    RevenueMaster.hasMany(models.ConsumableItem, {
-      foreignKey: "revenue_account_code",
-      as: "consumableItems",
-    });
+
   };
 
   return RevenueMaster;

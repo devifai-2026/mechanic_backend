@@ -6,6 +6,7 @@ import {
   updateEquipment,
   deleteEquipment,
   bulkUploadEquipment,
+  deleteEquipmentWithEmptyGroups,
 } from "../../../controllers/equipment/equipment.controller.js";
 import upload from "../../../middleware/bulkUpload.js";
 
@@ -16,5 +17,6 @@ router.get("/getAll/", getAllEquipment);
 router.get("/get/:id", getEquipmentById);
 router.post("/update/:id", updateEquipment);
 router.delete("/delete/:id", deleteEquipment);
+router.delete("/deleteall", deleteEquipmentWithEmptyGroups);
 router.post("/bulk-upload", upload.single("file"), bulkUploadEquipment);
 export default router;

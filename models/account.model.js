@@ -47,6 +47,10 @@ export const AccountModel = (sequelize) => {
       foreignKey: "expense_account_code",
       as: "expenseItems",
     });
+     Account.hasMany(models.ConsumableItem, {
+      foreignKey: "revenue_account_code",
+      as: "revenueItems",
+    });
   };
 
   return Account;

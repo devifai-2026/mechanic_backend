@@ -626,3 +626,78 @@ export const bulkUploadEquipment = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+export const deleteEquipmentWithEmptyGroups = async (req, res) => {
+  try {
+    console.log("🔍 Starting cleanup of equipment with empty groups...");
+    
+    // Find all equipment IDs that have no equipment groups
+    const equipmentWithNoGroups = await Equipment.findAll({
+      attributes: ['id'],
+      include: [{
+        model: EquipmentGroup,
+        as: 'equipmentGroup',
+        through: { attributes: [] }, // Don't include junction table attributes
+        required: false // Left join to include equipment without groups
+      }],
+      where: {
+        '$equipmentGroup.id$': null // Equipment with no associated groups
+      }
+    });
+
+    const equipmentIdsToDelete = equipmentWithNoGroups.map(eq => eq.id);
+    
+    console.log(`📊 Found ${equipmentIdsToDelete.length} equipment records with no groups`);
+
+    if (equipmentIdsToDelete.length === 0) {
+      console.log("✅ No equipment with empty groups found");
+      return res.status(200).json({ 
+        message: "No equipment with empty groups found",
+        deletedCount: 0 
+      });
+    }
+
+    // Log the equipment that will be deleted
+    console.log("🗑️ Equipment to be deleted:", equipmentIdsToDelete);
+
+    // Delete in batches to avoid timeout
+    let deletedCount = 0;
+    const batchSize = 50;
+
+    for (let i = 0; i < equipmentIdsToDelete.length; i += batchSize) {
+      const batch = equipmentIdsToDelete.slice(i, i + batchSize);
+      
+      // Delete from junction tables first
+      await EquipmentProject.destroy({
+        where: { equipment_id: batch }
+      });
+      
+      await EquipmentEquipmentGroup.destroy({
+        where: { equipment_id: batch }
+      });
+
+      // Delete the equipment records
+      const count = await Equipment.destroy({
+        where: { id: batch }
+      });
+      
+      deletedCount += count;
+      console.log(`✅ Deleted batch ${Math.floor(i/batchSize) + 1}: ${count} records`);
+    }
+
+    console.log(`🎉 Cleanup completed! Deleted ${deletedCount} equipment records with no groups`);
+    
+    return res.status(200).json({
+      message: `Successfully deleted ${deletedCount} equipment records with no groups`,
+      deletedCount: deletedCount,
+      deletedEquipmentIds: equipmentIdsToDelete
+    });
+
+  } catch (error) {
+    console.error("❌ Error deleting equipment with empty groups:", error);
+    return res.status(500).json({ 
+      message: "Failed to delete equipment with empty groups",
+      error: error.message 
+    });
+  }
+};

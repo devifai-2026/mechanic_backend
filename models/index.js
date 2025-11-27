@@ -243,8 +243,10 @@ const finalizeJunctionTable = async () => {
   }
 };
 
+
+
 // Replace your previous calls with this
-finalizeJunctionTable();
+// finalizeJunctionTable();
 // Sync the models
 // const syncModels = async () => {
 //   try {

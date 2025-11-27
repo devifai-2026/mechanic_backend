@@ -71,8 +71,8 @@ export const ConsumableItemsModel = (sequelize) => {
       revenue_account_code: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-          model: "revenue_master", // table name
+         references: {
+          model: "account", // table name
           key: "id",
         },
       },
@@ -114,7 +114,7 @@ export const ConsumableItemsModel = (sequelize) => {
     });
 
     // Revenue master relation
-    ConsumableItem.belongsTo(models.RevenueMaster, {
+    ConsumableItem.belongsTo(models.Account, {
       foreignKey: "revenue_account_code",
       as: "revenueAccount",
     });
