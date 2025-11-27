@@ -397,11 +397,32 @@ export const bulkUploadEquipment = async (req, res) => {
       return null;
     };
 
+    // Function to validate HSN number (exactly 8 digits)
+    const validateHSN = (hsnValue) => {
+      if (!hsnValue && hsnValue !== 0) return { isValid: false, message: "HSN is required" };
+      
+      // Convert to string and remove any whitespace
+      const hsnString = String(hsnValue).trim();
+      
+      // Check if it's exactly 8 digits
+      const hsnRegex = /^\d{8}$/;
+      
+      if (!hsnRegex.test(hsnString)) {
+        return { 
+          isValid: false, 
+          message: `HSN must be exactly 8 digits. Received: "${hsnString}" (${hsnString.length} digits)`
+        };
+      }
+      
+      return { isValid: true, hsnNumber: parseInt(hsnString, 10) };
+    };
+
     for (const [index, row] of rows.entries()) {
       const {
         equipment_name,
         equipment_sr_no,
         additional_id,
+        hsn,
         purchase_date,
         oem,
         purchase_cost,
@@ -413,7 +434,7 @@ export const bulkUploadEquipment = async (req, res) => {
       } = row;
 
       // Validate required fields
-      if (!equipment_name || !equipment_sr_no || !purchase_date || !oem || !equipment_group) {
+      if (!equipment_name || !equipment_sr_no || !purchase_date || !oem || !equipment_group || !hsn) {
         results.push({
           row: index + 2,
           status: "failed",
@@ -423,6 +444,17 @@ export const bulkUploadEquipment = async (req, res) => {
       }
 
       try {
+        // Validate HSN number
+        const hsnValidation = validateHSN(hsn);
+        if (!hsnValidation.isValid) {
+          results.push({
+            row: index + 2,
+            status: "failed",
+            message: hsnValidation.message,
+          });
+          continue;
+        }
+
         // Parse and validate purchase date
         console.log(`Processing row ${index + 2}, purchase_date raw value:`, purchase_date);
         const parsedPurchaseDate = parsePurchaseDate(purchase_date);
@@ -546,7 +578,7 @@ export const bulkUploadEquipment = async (req, res) => {
           equipment_manual: cleanLogField(equipment_manual),
           maintenance_log: cleanLogField(maintenance_log),
           other_log: cleanLogField(other_log),
-          hsn_number: 0,
+          hsn_number: hsnValidation.hsnNumber, // Use the validated HSN number
         });
 
         // Create equipment-group relationships
@@ -573,7 +605,7 @@ export const bulkUploadEquipment = async (req, res) => {
           row: index + 2,
           status: "success",
           equipmentId: newEquipment.id,
-          message: `Created with ${groups.length} group(s) and ${projects.length} project(s). Purchase date: ${parsedPurchaseDate}`,
+          message: `Created with ${groups.length} group(s) and ${projects.length} project(s). Purchase date: ${parsedPurchaseDate}, HSN: ${hsnValidation.hsnNumber}`,
         });
       } catch (error) {
         console.error(`Error in row ${index + 2}:`, error);
