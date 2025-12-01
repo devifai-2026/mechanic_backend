@@ -191,7 +191,7 @@ export const bulkUploadConsumableItems = async (req, res) => {
           unit_of_measurement: uom.id,
           item_qty_in_hand: parseInt(row.item_qty_in_hand) || 0,
           item_avg_cost: parseFloat(row.item_avg_cost) || 0,
-          hsn_number: (row.hsn_number || '').trim(),
+          hsn_number: String(row.hsn_number || '').trim(),
           inventory_account_code: inventoryAccount.id,
           expense_account_code: expenseAccount.id,
           revenue_account_code: revenueAccount.id,
