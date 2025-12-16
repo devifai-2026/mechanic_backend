@@ -69,6 +69,10 @@ export default (sequelize) => {
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     });
+     ProjectMasterModel.hasMany(models.StockLocation, {
+      foreignKey: "project_id",
+      as: "stock_locations",
+    });
   };
 
   return ProjectMasterModel;

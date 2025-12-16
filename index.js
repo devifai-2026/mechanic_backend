@@ -32,6 +32,7 @@ import siteInchargeRoutes from "./routes/SiteIncharge/site_incharge.routes.js"; 
 import projectManagerRoutes from "./routes/project_manager/proect_manager.routes.js"; // Import authentication routes
 import storeManagerRoutes from "./routes/storeManager/store_manager.routes.js"; // Import authentication routes
 import AccountManagerRoutes from "./routes/accountManager/accountManager.routes.js"; // Import authentication routes
+import stockRoutes from "./routes/admin/stockRoutes/stockRoutes.js"
 
 import { syncModels } from "./models/index.js";
 import jwtMiddleware from "./middleware/jwtMiddleware.js";
@@ -58,6 +59,7 @@ app.use("/api/master/auth", authentcationRoutes);
 
 // Use partner routes
 app.use("/api/master/super/admin/project", projectsRoutes);
+app.use("/api/master/super/admin/stock", stockRoutes);
 app.use("/api/master/super/admin/partner", partnerRoutes);
 app.use("/api/master/super/admin/job_master", job_masterRoutes);
 app.use("/api/master/super/admin/revenue_master", revenueRoutes);

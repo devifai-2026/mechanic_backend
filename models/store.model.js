@@ -25,6 +25,10 @@ export default (sequelize) => {
       otherKey: "project_id",
       as: "projects",
     });
+     StoreModel.hasMany(models.StockLocation, {
+      foreignKey: "store_id",
+      as: "stock_locations",
+    });
   };
   return StoreModel;
 };

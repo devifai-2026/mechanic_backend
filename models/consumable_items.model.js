@@ -118,6 +118,10 @@ export const ConsumableItemsModel = (sequelize) => {
       foreignKey: "revenue_account_code",
       as: "revenueAccount",
     });
+      ConsumableItem.hasMany(models.StockLocation, {
+      foreignKey: "consumable_item_id",
+      as: "stock_locations",
+    });
   };
 
   return ConsumableItem;

@@ -281,6 +281,88 @@ export const getProjectById = async (req, res) => {
   }
 };
 
+// Get Project by Store ID (with all associations)
+export const getProjectByStoreId = async (req, res) => {
+  const { id } = req.body; // Using params instead of body for GET request
+
+  console.log({ id });
+
+  try {
+    // Find projects that have this store in their store_locations
+    const projects = await Project_Master.findAll({
+      include: [
+        {
+          association: "customer",
+          attributes: ["id", "partner_name"],
+        },
+        {
+          association: "equipments",
+          attributes: ["id", "equipment_name"],
+          through: { attributes: [] },
+        },
+        {
+          association: "staff",
+          attributes: ["id", "emp_name", "role_id"],
+          through: { attributes: [] },
+          include: [
+            {
+              association: "role",
+              attributes: ["name"],
+            },
+          ],
+        },
+        {
+          association: "revenues",
+          attributes: ["id", "revenue_code", "revenue_description"],
+          through: { attributes: [] },
+        },
+        {
+          association: "store_locations",
+          attributes: ["id", "store_code", "store_name"],
+          through: { attributes: [] },
+          where: { id }, // Filter to only include this store
+        },
+      ],
+    });
+
+    if (!projects || projects.length === 0) {
+      return res.status(404).json({
+        message: "No projects found for this store",
+        storeId: id,
+      });
+    }
+
+    // Format each project with duration
+    const formattedProjects = projects.map((project) => {
+      const start = new Date(project.contract_start_date);
+      const end = new Date(project.contract_end_date);
+      const duration = `${Math.ceil(
+        (end - start) / (1000 * 60 * 60 * 24)
+      )} days`;
+
+      return {
+        ...project.toJSON(),
+        contract_end_date: project.contract_end_date,
+        duration,
+      };
+    });
+
+    return res.status(200).json({
+      message: "Projects retrieved successfully",
+      count: formattedProjects.length,
+      storeId: id,
+      projects: formattedProjects,
+    });
+  } catch (error) {
+    console.error("Error fetching projects by store ID:", error);
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+      storeId: id,
+    });
+  }
+};
+
 // Update Project
 export const updateProject = async (req, res) => {
   const {
@@ -466,7 +548,7 @@ export const bulkUploadProjects = async (req, res) => {
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    
+
     // Use sheet_to_json with header to get proper object structure
     const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
@@ -507,7 +589,7 @@ export const bulkUploadProjects = async (req, res) => {
         contractEndDate,
         revenueMaster,
         equipments: equipmentStr,
-        storeLocations
+        storeLocations,
       } = row;
 
       console.log(`Processing row ${index + 2}:`, {
@@ -518,7 +600,7 @@ export const bulkUploadProjects = async (req, res) => {
         contractEndDate,
         revenueMaster,
         equipmentStr,
-        storeLocations
+        storeLocations,
       });
 
       if (!projectNo) {
@@ -570,7 +652,9 @@ export const bulkUploadProjects = async (req, res) => {
             .filter(Boolean)
         : [];
 
-      console.log(`Parsed IDs - Revenue: ${revenue_master_ids.length}, Store: ${store_location_ids.length}, Equipment: ${equipment_ids.length}`);
+      console.log(
+        `Parsed IDs - Revenue: ${revenue_master_ids.length}, Store: ${store_location_ids.length}, Equipment: ${equipment_ids.length}`
+      );
 
       // Validations
       if (!customer || !customerMap.has(customer.trim())) {
@@ -606,42 +690,54 @@ export const bulkUploadProjects = async (req, res) => {
       // Parse dates
       const parseDate = (dateValue) => {
         if (!dateValue) return null;
-        
+
         // Handle Excel serial numbers
-        if (typeof dateValue === 'number') {
+        if (typeof dateValue === "number") {
           const excelEpoch = new Date(1900, 0, 1);
-          const date = new Date(excelEpoch.getTime() + (dateValue - 1) * 24 * 60 * 60 * 1000);
+          const date = new Date(
+            excelEpoch.getTime() + (dateValue - 1) * 24 * 60 * 60 * 1000
+          );
           if (dateValue > 60) date.setDate(date.getDate() - 1);
-          return date.toISOString().split('T')[0];
+          return date.toISOString().split("T")[0];
         }
-        
+
         // Handle string dates (YYYY-MM-DD format)
-        if (typeof dateValue === 'string') {
+        if (typeof dateValue === "string") {
           const trimmedValue = dateValue.trim();
           // Try YYYY-MM-DD format
           const yyyyMmDdRegex = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
           const match = trimmedValue.match(yyyyMmDdRegex);
-          
+
           if (match) {
             const year = parseInt(match[1], 10);
             const month = parseInt(match[2], 10) - 1;
             const day = parseInt(match[3], 10);
-            
-            if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900) {
+
+            if (
+              day >= 1 &&
+              day <= 31 &&
+              month >= 0 &&
+              month <= 11 &&
+              year >= 1900
+            ) {
               const date = new Date(year, month, day);
-              if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === year) {
-                return date.toISOString().split('T')[0];
+              if (
+                date.getDate() === day &&
+                date.getMonth() === month &&
+                date.getFullYear() === year
+              ) {
+                return date.toISOString().split("T")[0];
               }
             }
           }
-          
+
           // Try other formats
           const parsedDate = new Date(trimmedValue);
           if (!isNaN(parsedDate.getTime())) {
-            return parsedDate.toISOString().split('T')[0];
+            return parsedDate.toISOString().split("T")[0];
           }
         }
-        
+
         return null;
       };
 
@@ -668,12 +764,12 @@ export const bulkUploadProjects = async (req, res) => {
           contract_end_date,
           revenue_master_ids,
           store_location_ids,
-          equipment_ids // Pass equipment IDs if needed
+          equipment_ids, // Pass equipment IDs if needed
         });
 
         results.push({
           row: index + 2,
-          ...result
+          ...result,
         });
       } catch (error) {
         console.error(`Error processing project ${projectNo}:`, error);

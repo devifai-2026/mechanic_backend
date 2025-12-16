@@ -1,6 +1,6 @@
-import { sequelize } from "../config/mysql.js"; // Named import
+import { sequelize } from "../config/mysql.js";
 import JobMasterModel from "./job_master.model.js";
-import PartnerModel from "./partner.model.js"; // Import the Partner model
+import PartnerModel from "./partner.model.js";
 import ProjectMasterModel from "./project_master.model.js";
 import RevenueMasterModel from "./revenue.model.js";
 import ShiftModel from "./shift.model.js";
@@ -31,24 +31,27 @@ import { ConsumptionSheetItemModel } from "./consumption_sheet_item.model.js";
 import { MaintenanceSheetItemModel } from "./maintenanceSheetItem.model.js";
 import { EmployeeOrganisationsModel } from "./junctionTable/EmployeeOrganisations.js";
 import DailyProgressReportModel from "./daily_progress_report.js";
-import DailyProgressReportFormModel from "./daily_progress_report_form.model.js"; // <-- Add this
-import MaterialTransactionModel from "./material_transactions.js"; // <-- Add this
-import MaterialTransactionsFormModel from "./material_transactions_form.model.js"; // <-- Add this
-import EquipmentTransacationModel from "./equipment_transaction.model.js"; // <-- Add this
-import EquipmentTransactionsFormModel from "./equipment_transactionForm.model.js"; // <-- Add this
-import MaterialBillTransactionModel from "./material_bill.model.js"; // <-- Add this
-import MaterialBillTransactionsFormModel from "./material_bill.form.model.js"; // <-- Add this
-import ExpenseInputModel from "./expenseInput.model.js"; // <-- Add this
-import RevenuenputModel from "./revenueInput.model.js"; // <-- Add this
+import DailyProgressReportFormModel from "./daily_progress_report_form.model.js";
+import MaterialTransactionModel from "./material_transactions.js";
+import MaterialTransactionsFormModel from "./material_transactions_form.model.js";
+import EquipmentTransacationModel from "./equipment_transaction.model.js";
+import EquipmentTransactionsFormModel from "./equipment_transactionForm.model.js";
+import MaterialBillTransactionModel from "./material_bill.model.js";
+import MaterialBillTransactionsFormModel from "./material_bill.form.model.js";
+import ExpenseInputModel from "./expenseInput.model.js";
+import RevenuenputModel from "./revenueInput.model.js";
 import DieselInvoiceModel from "./DieselInvoices.js";
 import DieselInvoiceForm from "./DieselInvoiceSubform.model.js";
-import EmployeeLoginLogModel from "../models/junctionTable/EmployeeLoginLog.js";
-import AdminModel from "../models/admin.model.js";
+import EmployeeLoginLogModel from "./junctionTable/EmployeeLoginLog.js";
+import AdminModel from "./admin.model.js";
 import EquipmentEquipmentGroupModel from "./junctionTable/EquipmentEquipmentGroup.js";
+// Fixed imports - use named imports for the models
+import { StockLocationModel } from "./stockLocationModel.js";
+import { StockEntryModel } from "./stockEntryModel.js";
 
-//Step 1: Initialize models
-const Project_Master = ProjectMasterModel(sequelize); // Pass the sequelize instance to the model
-const Partner = PartnerModel(sequelize); // Pass the sequelize instance to the model
+// Step 1: Initialize models
+const Project_Master = ProjectMasterModel(sequelize);
+const Partner = PartnerModel(sequelize);
 const RevenueMaster = RevenueMasterModel(sequelize);
 const Admin = AdminModel(sequelize);
 const JobMaster = JobMasterModel(sequelize);
@@ -68,7 +71,6 @@ const Organisations = OrganisationModel(sequelize);
 const UOM = UOMModel(sequelize);
 const DieselRequisitions = DieselRequisitionModel(sequelize);
 const DieselRequisitionItems = DieselRequisitionItemModel(sequelize);
-
 const ConsumableItem = ConsumableItemsModel(sequelize);
 const ItemGroup = ItemGroupModel(sequelize);
 const OEM = OEMModel(sequelize);
@@ -82,7 +84,7 @@ const MaintenanceSheet = MaintenanceSheetModel(sequelize);
 const MaintenanceSheetItem = MaintenanceSheetItemModel(sequelize);
 const EmployeeOrganisations = EmployeeOrganisationsModel(sequelize);
 const DailyProgressReport = DailyProgressReportModel(sequelize);
-const DailyProgressReportForm = DailyProgressReportFormModel(sequelize); // <-- Add this
+const DailyProgressReportForm = DailyProgressReportFormModel(sequelize);
 const MaterialTransaction = MaterialTransactionModel(sequelize);
 const MaterialTransactionForm = MaterialTransactionsFormModel(sequelize);
 const EquipmentTransaction = EquipmentTransacationModel(sequelize);
@@ -93,8 +95,10 @@ const RevenueInput = RevenuenputModel(sequelize);
 const DieselInvoiceSubform = DieselInvoiceForm(sequelize);
 const DieselInvoice = DieselInvoiceModel(sequelize);
 const EmployeeLoginLog = EmployeeLoginLogModel(sequelize);
-const MaterialBillTransactionForm =
-  MaterialBillTransactionsFormModel(sequelize);
+const MaterialBillTransactionForm = MaterialBillTransactionsFormModel(sequelize);
+// Initialize stock models
+const StockLocation = StockLocationModel(sequelize);
+const StockEntry = StockEntryModel(sequelize);
 
 const models = {
   sequelize,
@@ -123,7 +127,7 @@ const models = {
   OEM,
   AccountGroup,
   Account,
-  EquipmentEquipmentGroup, // Add this
+  EquipmentEquipmentGroup,
   DieselReceipt,
   DieselReceiptItem,
   ConsumptionSheet,
@@ -144,6 +148,8 @@ const models = {
   DieselInvoiceSubform,
   DieselInvoice,
   EmployeeLoginLog,
+  StockLocation,
+  StockEntry,
 };
 
 // Step 2: Call associations AFTER all models are initialized
@@ -154,113 +160,10 @@ Object.values(models).forEach((model) => {
 });
 
 
-// Add this to your models/index.js file temporarily
 
-// models/index.js - Complete fix
-const fixJunctionTable = async () => {
-  try {
-    console.log("🔍 Checking data types...");
-    
-    // Check the actual data types of the referenced tables
-    const [equipmentInfo] = await sequelize.query(`
-      SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'equipment' 
-      AND TABLE_SCHEMA = 'maco_mechanic'
-      AND COLUMN_NAME = 'id'
-    `);
-    
-    const [groupInfo] = await sequelize.query(`
-      SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'equipment_group' 
-      AND TABLE_SCHEMA = 'maco_mechanic'
-      AND COLUMN_NAME = 'id'
-    `);
-    
-    console.log("Equipment ID type:", equipmentInfo[0]);
-    console.log("Equipment Group ID type:", groupInfo[0]);
-    
-    // Drop the existing junction table if it exists
-    await sequelize.query(`DROP TABLE IF EXISTS EquipmentEquipmentGroup`);
-    
-    // Create junction table with matching data types
-    const equipmentType = equipmentInfo[0]?.COLUMN_TYPE || 'CHAR(36)';
-    const groupType = groupInfo[0]?.COLUMN_TYPE || 'CHAR(36)';
-    
-    console.log(`Using equipment_id type: ${equipmentType}`);
-    console.log(`Using equipment_group_id type: ${groupType}`);
-    
-    await sequelize.query(`
-      CREATE TABLE EquipmentEquipmentGroup (
-        id CHAR(36) NOT NULL,
-        equipment_id ${equipmentType} NOT NULL,
-        equipment_group_id ${groupType} NOT NULL,
-        createdAt DATETIME NOT NULL,
-        updatedAt DATETIME NOT NULL,
-        PRIMARY KEY (id),
-        UNIQUE KEY equipment_group_unique (equipment_id, equipment_group_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-    
-    console.log("✅ Junction table created with correct data types");
-    
-  } catch (error) {
-    console.error("❌ Failed to fix junction table:", error.message);
-  }
-};
+// Export models and syncModels function
+export { models, syncModels };
 
-// Call this instead of createJunctionTable
-// fixJunctionTable();
-// models/index.js - Add foreign keys
-// models/index.js - Final setup without foreign keys
-const finalizeJunctionTable = async () => {
-  try {
-    console.log("🔄 Finalizing junction table setup...");
-    
-    // Drop and recreate without foreign key attempts
-    await sequelize.query(`DROP TABLE IF EXISTS EquipmentEquipmentGroup`);
-    
-    await sequelize.query(`
-      CREATE TABLE EquipmentEquipmentGroup (
-        id CHAR(36) NOT NULL,
-        equipment_id CHAR(36) NOT NULL,
-        equipment_group_id CHAR(36) NOT NULL,
-        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY equipment_group_unique (equipment_id, equipment_group_id),
-        INDEX idx_equipment_id (equipment_id),
-        INDEX idx_equipment_group_id (equipment_group_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-    
-    console.log("✅ Junction table ready for use (without foreign keys)");
-    console.log("📝 You can add foreign keys later via database migration");
-    
-  } catch (error) {
-    console.error("❌ Final setup failed:", error.message);
-  }
-};
-
-
-
-// Replace your previous calls with this
-// finalizeJunctionTable();
-// Sync the models
-// const syncModels = async () => {
-//   try {
-//     // Now safely sync your models
-//     // await sequelize.sync({ alter: true });
-//     console.log("✅ Sync successful");
-//   } catch (err) {
-//     console.error("❌ Sync failed:", err);
-//   }
-// };
-
-
-
-//DONT RUN TIHS
 const syncModels = async () => {
   try {
     await sequelize.sync({ alter: true });
@@ -270,5 +173,44 @@ const syncModels = async () => {
   }
 };
 
-// Export models and syncModels function
-export { models, syncModels };
+// Add this new function for syncing only stock tables
+const fixStockTables = async () => {
+  try {
+    console.log('🔧 Fixing stock table columns...');
+    
+    // Check and fix stock_location table
+    const [locationColumns] = await sequelize.query(`
+      SHOW COLUMNS FROM stock_location LIKE 'created_at'
+    `);
+    
+    if (locationColumns.length === 0) {
+      console.log('📝 Adding created_at and updated_at to stock_location...');
+      await sequelize.query(`
+        ALTER TABLE stock_location 
+        ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      `);
+    }
+    
+    // Check and fix stock_entry table
+    const [entryColumns] = await sequelize.query(`
+      SHOW COLUMNS FROM stock_entry LIKE 'created_at'
+    `);
+    
+    if (entryColumns.length === 0) {
+      console.log('📝 Adding created_at and updated_at to stock_entry...');
+      await sequelize.query(`
+        ALTER TABLE stock_entry 
+        ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      `);
+    }
+    
+    console.log('✅ Stock table columns fixed');
+  } catch (error) {
+    console.error('❌ Error fixing table columns:', error.message);
+  }
+};
+
+// Call this after your syncStockTables function
+// await fixStockTables();
