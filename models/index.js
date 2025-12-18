@@ -174,43 +174,43 @@ const syncModels = async () => {
 };
 
 // Add this new function for syncing only stock tables
-const fixStockTables = async () => {
+const fixDOBColumnOnly = async () => {
   try {
-    console.log('🔧 Fixing stock table columns...');
+    console.log('🔧 Fixing dob column to be nullable...');
     
-    // Check and fix stock_location table
-    const [locationColumns] = await sequelize.query(`
-      SHOW COLUMNS FROM stock_location LIKE 'created_at'
+    // Check if dob column exists
+    const [dobColumn] = await sequelize.query(`
+      SHOW COLUMNS FROM employee WHERE Field = 'dob'
     `);
     
-    if (locationColumns.length === 0) {
-      console.log('📝 Adding created_at and updated_at to stock_location...');
-      await sequelize.query(`
-        ALTER TABLE stock_location 
-        ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      `);
+    if (dobColumn.length === 0) {
+      console.log('❌ dob column does not exist in employee table');
+      return;
     }
     
-    // Check and fix stock_entry table
-    const [entryColumns] = await sequelize.query(`
-      SHOW COLUMNS FROM stock_entry LIKE 'created_at'
-    `);
+    const columnInfo = dobColumn[0];
+    const isNullable = columnInfo.Null === 'YES';
+    const columnType = columnInfo.Type;
     
-    if (entryColumns.length === 0) {
-      console.log('📝 Adding created_at and updated_at to stock_entry...');
+    console.log(`Current dob column: Type=${columnType}, Nullable=${isNullable}`);
+    
+    if (!isNullable) {
+      console.log('📝 Making dob column nullable...');
       await sequelize.query(`
-        ALTER TABLE stock_entry 
-        ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ALTER TABLE employee 
+        MODIFY COLUMN dob ${columnType} NULL
       `);
+      console.log('✅ dob column is now nullable');
+    } else {
+      console.log('✅ dob column is already nullable');
     }
     
-    console.log('✅ Stock table columns fixed');
   } catch (error) {
-    console.error('❌ Error fixing table columns:', error.message);
+    console.error('❌ Error fixing dob column:', error.message);
+    console.error('Full error:', error);
   }
 };
+// fixDOBColumnOnly()
 
 // Call this after your syncStockTables function
 // await fixStockTables();
