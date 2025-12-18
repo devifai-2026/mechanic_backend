@@ -1,5 +1,5 @@
 import { models } from "../../models/index.js";
-const { ConsumableItem, ItemGroup, OEM, UOM, Account, RevenueMaster } = models;
+const { ConsumableItem, ItemGroup, OEM, UOM, Account, StockLocation, Partner, Store,  Project_Master } = models;
 import XLSX from "xlsx";
 import { where, fn, col } from "sequelize";
 
@@ -24,16 +24,98 @@ export const getAllConsumableItems = async (req, res) => {
         { model: UOM, as: "uom" },
         { model: Account, as: "inventoryAccount" },
         { model: Account, as: "expenseAccount" },
-        { model: Account, as: "revenueAccount" }, // Changed from RevenueMaster to Account
+        { model: Account, as: "revenueAccount" },
       ],
     });
-    return res.status(200).json(items);
+
+    // For each item, get stock locations
+    const itemsWithStock = await Promise.all(
+      items.map(async (item) => {
+        const itemData = item.toJSON();
+        
+        try {
+          // Get stock locations for this item
+          const stockLocations = await StockLocation.findAll({
+            where: { consumable_item_id: item.id },
+            include: [
+              {
+                model: Store,
+                as: "store",
+                attributes: ["id", "store_code", "store_name", "store_location"],
+              },
+              {
+                model: Project_Master,
+                as: "project",
+                attributes: ["id", "project_no", "order_no"],
+                include: [
+                  {
+                    model: Partner,
+                    as: "customer",
+                    attributes: ["id", "partner_name"],
+                  },
+                ],
+              },
+            ],
+          });
+
+          // Calculate total closing stock
+          let totalClosingStock = 0;
+          let latestStockData = [];
+
+          if (stockLocations.length > 0) {
+            // Sum up closing stock and prepare data
+            totalClosingStock = stockLocations.reduce((sum, location) => 
+              sum + (parseFloat(location.closing_stock) || 0), 0
+            );
+
+            // Prepare location data
+            latestStockData = stockLocations.map(location => ({
+              location_id: location.id,
+              store_code: location.store?.store_code || 'N/A',
+              store_name: location.store?.store_name || 'N/A',
+              store_location: location.store?.store_location || 'N/A',
+              project_no: location.project?.project_no || 'N/A',
+              order_no: location.project?.order_no || 'N/A',
+              customer_name: location.project?.customer?.partner_name || 'N/A',
+              opening_stock: location.opening_stock,
+              closing_stock: location.closing_stock,
+              last_updated: location.last_updated || location.updated_at
+            }));
+          }
+
+          // Return item with stock data
+          return {
+            ...itemData,
+            stock_info: {
+              total_closing_stock: totalClosingStock,
+              uom: item.uom?.unit_name || itemData.uom?.unit_name || '',
+              stock_locations_count: stockLocations.length,
+              latest_stock_entries: latestStockData
+            }
+          };
+        } catch (stockError) {
+          console.error(`Error fetching stock for item ${item.id}:`, stockError.message);
+          // Return item without stock data if there's an error
+          return {
+            ...itemData,
+            stock_info: {
+              total_closing_stock: 0,
+              uom: item.uom?.unit_name || itemData.uom?.unit_name || '',
+              stock_locations_count: 0,
+              latest_stock_entries: [],
+              error: "Could not fetch stock data"
+            }
+          };
+        }
+      })
+    );
+
+    return res.status(200).json(itemsWithStock);
   } catch (error) {
     console.error("Error fetching items:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 // Get Item by ID
 export const getConsumableItemById = async (req, res) => {
   const { id } = req.params;

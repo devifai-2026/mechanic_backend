@@ -13,6 +13,7 @@ import {
   createStockLocationWithEntry,
   updateStockLocation,
   deleteStockLocation,
+  getAllStockEntries,
 } from "../../../controllers/admin/stockEntry/stockLocationController.js";
 
 const router = express.Router();
@@ -29,5 +30,6 @@ router.post("/locations/:locationId/entries", createStockEntry);
 router.get("/entries/:entryId", getStockEntryById);
 router.put("/entries/:entryId", updateStockEntry);
 router.delete("/entries/:entryId", deleteStockEntry);
+router.get("/entries/all", getAllStockEntries);
 
 export default router;

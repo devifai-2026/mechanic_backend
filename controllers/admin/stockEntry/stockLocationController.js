@@ -30,15 +30,48 @@ export const getStockLocationsByItem = async (req, res) => {
           },
         ],
       },
+      {
+        model: StockEntry,
+        as: "entries",
+        attributes: ["id", "quantity", "unit_price", "entry_date", "remarks"],
+        required: false, // Use false to get locations even without entries
+      },
     ];
 
     const locations = await StockLocation.findAll({
       where: whereCondition,
       include: includeOptions,
-      order: [["last_updated", "DESC"]],
+      order: [
+        ["last_updated", "DESC"],
+        [{ model: StockEntry, as: "entries" }, "entry_date", "DESC"], // Order entries by date
+      ],
     });
 
-    res.status(200).json(locations);
+    // Calculate total quantity, value, and average price
+    const locationsWithCalculations = locations.map(location => {
+      const locationJSON = location.toJSON();
+      
+      // Calculate totals from entries
+      let totalQuantity = 0;
+      let totalValue = 0;
+      
+      if (locationJSON.entries && locationJSON.entries.length > 0) {
+        locationJSON.entries.forEach(entry => {
+          totalQuantity += parseFloat(entry.quantity);
+          totalValue += parseFloat(entry.quantity) * parseFloat(entry.unit_price);
+        });
+      }
+      
+      // Add calculated fields
+      locationJSON.total_quantity = totalQuantity;
+      locationJSON.total_value = totalValue;
+      locationJSON.average_unit_price = totalQuantity > 0 ? 
+        (totalValue / totalQuantity).toFixed(2) : 0;
+      
+      return locationJSON;
+    });
+
+    res.status(200).json(locationsWithCalculations);
   } catch (error) {
     console.error("Error fetching stock locations:", error);
     res.status(500).json({ 
@@ -124,6 +157,265 @@ export const createStockLocationWithEntry = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error("Error creating stock location:", error);
+    res.status(500).json({ 
+      message: "Internal Server Error", 
+      error: error.message
+    });
+  }
+};
+
+
+// File: controllers/admin/stockEntry/stockEntryController.js
+
+
+// Get ALL stock entries OR locations if entries don't exist
+export const getAllStockEntries = async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      search = "",
+      storeCode,
+      projectCode,
+      startDate,
+      endDate,
+      entryType,
+      itemCode,
+      itemName
+    } = req.query;
+    
+
+    const offset = (page - 1) * limit;
+
+    // Try to get from StockEntry first
+    let whereCondition = {};
+    const includeOptions = [
+      {
+        model: StockLocation,
+        as: "location",
+        required: true,
+        include: [
+          {
+            model: Store,
+            as: "store",
+            attributes: ["id", "store_code", "store_name", "store_location"],
+            where: storeCode ? { store_code: { [Op.like]: `%${storeCode}%` } } : undefined,
+          },
+          {
+            model: Project_Master,
+            as: "project",
+            attributes: ["id", "project_no", "order_no"],
+            where: projectCode ? { project_no: { [Op.like]: `%${projectCode}%` } } : undefined,
+            include: [
+              {
+                model: Partner,
+                as: "customer",
+                attributes: ["id", "partner_name"],
+              },
+            ],
+          },
+          {
+            model: ConsumableItem,
+            as: "consumable_item",
+            attributes: ["id", "item_code", "item_name"],
+            where: itemCode ? { item_code: { [Op.like]: `%${itemCode}%` } } : 
+                   itemName ? { item_name: { [Op.like]: `%${itemName}%` } } : undefined,
+          },
+        ],
+      },
+    ];
+
+    // Search filter
+    if (search) {
+      whereCondition[Op.or] = [
+        Sequelize.where(
+          Sequelize.fn('LOWER', Sequelize.col('location.store.store_code')),
+          { [Op.like]: `%${search.toLowerCase()}%` }
+        ),
+        Sequelize.where(
+          Sequelize.fn('LOWER', Sequelize.col('location.project.project_no')),
+          { [Op.like]: `%${search.toLowerCase()}%` }
+        ),
+        Sequelize.where(
+          Sequelize.fn('LOWER', Sequelize.col('location.consumable_item.item_code')),
+          { [Op.like]: `%${search.toLowerCase()}%` }
+        ),
+        Sequelize.where(
+          Sequelize.fn('LOWER', Sequelize.col('location.consumable_item.item_name')),
+          { [Op.like]: `%${search.toLowerCase()}%` }
+        ),
+        Sequelize.where(
+          Sequelize.fn('LOWER', Sequelize.col('remarks')),
+          { [Op.like]: `%${search.toLowerCase()}%` }
+        ),
+      ];
+    }
+    
+    if (entryType) {
+      whereCondition.entry_type = entryType;
+    }
+    
+    if (startDate && endDate) {
+      whereCondition.entry_date = {
+        [Op.between]: [new Date(startDate), new Date(endDate)],
+      };
+    }
+
+    try {
+      // Try to get stock entries
+      const { count, rows: entries } = await StockEntry.findAndCountAll({
+        where: whereCondition,
+        include: includeOptions,
+        order: [["entry_date", "DESC"], ["created_at", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        distinct: true,
+      });
+
+      // Format the response
+      const formattedEntries = entries.map(entry => ({
+        id: entry.id,
+        date: entry.entry_date || entry.created_at,
+        storeCode: entry.location?.store?.store_code || 'N/A',
+        storeName: entry.location?.store?.store_name || 'N/A',
+        storeLocation: entry.location?.store?.store_location || 'N/A',
+        projectCode: entry.location?.project?.project_no || 'N/A',
+        orderNo: entry.location?.project?.order_no || 'N/A',
+        customerName: entry.location?.project?.customer?.partner_name || 'N/A',
+        itemCode: entry.location?.consumable_item?.item_code || 'N/A',
+        itemName: entry.location?.consumable_item?.item_name || 'N/A',
+        quantity: parseFloat(entry.quantity) || 0,
+        unitPrice: parseFloat(entry.unit_price) || 0,
+        totalPrice: (parseFloat(entry.quantity) || 0) * (parseFloat(entry.unit_price) || 0),
+        openingStock: parseFloat(entry.opening_stock) || 0,
+        closingStock: parseFloat(entry.closing_stock) || 0,
+        entryType: entry.entry_type || 'Stock Entry',
+        remarks: entry.remarks || '',
+        createdBy: entry.created_by,
+        createdAt: entry.created_at,
+        updatedAt: entry.updated_at,
+      }));
+
+      const totalPages = Math.ceil(count / limit);
+
+      res.status(200).json({
+        entries: formattedEntries,
+        pagination: {
+          totalItems: count,
+          totalPages,
+          currentPage: parseInt(page),
+          itemsPerPage: parseInt(limit),
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+      });
+
+    } catch (error) {
+      // If no StockEntry data, try to get from StockLocation
+      console.log("No StockEntry data, trying StockLocation...");
+      
+      // Get stock locations with filters
+      const locationWhereCondition = {};
+      const locationIncludeOptions = [
+        {
+          model: Store,
+          as: "store",
+          attributes: ["id", "store_code", "store_name", "store_location"],
+          where: storeCode ? { store_code: { [Op.like]: `%${storeCode}%` } } : undefined,
+        },
+        {
+          model: Project_Master,
+          as: "project",
+          attributes: ["id", "project_no", "order_no"],
+          where: projectCode ? { project_no: { [Op.like]: `%${projectCode}%` } } : undefined,
+          include: [
+            {
+              model: Partner,
+              as: "customer",
+              attributes: ["id", "partner_name"],
+            },
+          ],
+        },
+        {
+          model: ConsumableItem,
+          as: "consumable_item",
+          attributes: ["id", "item_code", "item_name"],
+          where: itemCode ? { item_code: { [Op.like]: `%${itemCode}%` } } : 
+                 itemName ? { item_name: { [Op.like]: `%${itemName}%` } } : undefined,
+        },
+      ];
+
+      // Apply search filter to locations
+      if (search) {
+        locationWhereCondition[Op.or] = [
+          Sequelize.where(
+            Sequelize.fn('LOWER', Sequelize.col('store.store_code')),
+            { [Op.like]: `%${search.toLowerCase()}%` }
+          ),
+          Sequelize.where(
+            Sequelize.fn('LOWER', Sequelize.col('project.project_no')),
+            { [Op.like]: `%${search.toLowerCase()}%` }
+          ),
+          Sequelize.where(
+            Sequelize.fn('LOWER', Sequelize.col('consumable_item.item_code')),
+            { [Op.like]: `%${search.toLowerCase()}%` }
+          ),
+          Sequelize.where(
+            Sequelize.fn('LOWER', Sequelize.col('consumable_item.item_name')),
+            { [Op.like]: `%${search.toLowerCase()}%` }
+          ),
+        ];
+      }
+
+      const { count: locationCount, rows: locations } = await StockLocation.findAndCountAll({
+        where: locationWhereCondition,
+        include: locationIncludeOptions,
+        order: [["last_updated", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        distinct: true,
+      });
+
+      // Format locations as entries for the history table
+      const formattedEntries = locations.map(location => ({
+        id: location.id,
+        date: location.last_updated || location.created_at,
+        storeCode: location.store?.store_code || 'N/A',
+        storeName: location.store?.store_name || 'N/A',
+        storeLocation: location.store?.store_location || 'N/A',
+        projectCode: location.project?.project_no || 'N/A',
+        orderNo: location.project?.order_no || 'N/A',
+        customerName: location.project?.customer?.partner_name || 'N/A',
+        itemCode: location.consumable_item?.item_code || 'N/A',
+        itemName: location.consumable_item?.item_name || 'N/A',
+        quantity: 0, // No quantity for location-only entries
+        unitPrice: 0,
+        totalPrice: 0,
+        openingStock: parseFloat(location.opening_stock) || 0,
+        closingStock: parseFloat(location.closing_stock) || 0,
+        entryType: 'Stock Location',
+        remarks: 'Location record',
+        createdAt: location.created_at,
+        updatedAt: location.updated_at,
+      }));
+
+      const totalPages = Math.ceil(locationCount / limit);
+
+      res.status(200).json({
+        entries: formattedEntries,
+        pagination: {
+          totalItems: locationCount,
+          totalPages,
+          currentPage: parseInt(page),
+          itemsPerPage: parseInt(limit),
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+      });
+    }
+
+  } catch (error) {
+    console.error("Error fetching stock entries:", error);
     res.status(500).json({ 
       message: "Internal Server Error", 
       error: error.message
